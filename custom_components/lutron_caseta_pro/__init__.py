@@ -82,21 +82,18 @@ async def request_configuration(hass, config, host, bridge):
             return False
 
         # parse JSON integration report
-        json_int_report = json.loads(integration_report_data)
+        # json_int_report = json.loads(integration_report_data)
 
-        # check for top-level object
-        if not json_int_report["LIPIdList"]:
-            configurator.notify_errors(request_id,
-                                       "Error parsing Integration Report. "
-                                       "Expecting it to start "
-                                       "with 'LIPIdList'.")
-            return False
+        # # check for top-level object
+        # if not json_int_report["LIPIdList"]:
+        #     configurator.notify_errors(request_id, "Error parsing Integration Report. Expecting it to start with 'LIPIdList'.")
+        #     return False
 
-        str_int_report = json.dumps(json_int_report, indent=2)
+        # str_int_report = json.dumps(json_int_report, indent=2)
         fname = get_config_file(hass, host)
         _LOGGER.debug("Writing out JSON integration report to %s", fname)
         with open(fname, 'w', encoding='utf-8') as outfile:
-            outfile.write(str_int_report)
+            outfile.write(integration_report_data)
 
         # run setup
         _LOGGER.debug("Running setup for host %s", host)
@@ -120,7 +117,7 @@ async def request_configuration(hass, config, host, bridge):
 
 def get_config_file(hass, host):
     """Return expected path to the integration report."""
-    return hass.config.path(DOMAIN + "_" + host + ".json")
+    return hass.config.path(DOMAIN + "_" + host + ".xml")
 
 
 async def async_setup(hass, config):

@@ -40,58 +40,98 @@ async def async_load_integration_report(fname):
     and an 'area_name' attribute if the device is assigned
     to an area.
     """
+    import xml.etree.ElementTree as ET
+    root = ET.parse(fname)
+
     devices = []
-    with open(fname, encoding='utf-8') as conf_file:
-        integration_report = json.load(conf_file)
-        # _LOGGER.debug(integration)
-        if "LIPIdList" in integration_report:
-            # lights and switches are in Zones
-            if "Zones" in integration_report["LIPIdList"]:
-                _process_zones(devices, integration_report)
-            # remotes are in Devices, except ID 1 which is the bridge itself
-            if "Devices" in integration_report["LIPIdList"]:
-                for device in integration_report["LIPIdList"]["Devices"]:
-                    # extract scenes from integration ID 1 - the smart bridge
-                    if device["ID"] == 1 and "Buttons" in device:
-                        _process_scenes(devices, device)
-                    elif device["ID"] != 1 and "Buttons" in device:
-                        device_obj = {CONF_ID: device["ID"],
-                                      CONF_NAME: device["Name"],
-                                      CONF_TYPE: "sensor",
-                                      CONF_BUTTONS: [b["Number"] for b in device["Buttons"]]}
-                        if "Area" in device and "Name" in device["Area"]:
-                            device_obj[CONF_AREA_NAME] = device["Area"]["Name"]
-                        devices.append(device_obj)
-        else:
-            _LOGGER.warning("'LIPIdList' not found in the Integration Report."
-                            " No devices will be loaded.")
+    # First area is useless, it's the top-level project area that defines the
+    # "house". It contains the real nested Areas tree, which is the one we want.
+    top_area = root.find("Areas").find("Area")
+    project_name = top_area.get("Name")
+    areas = top_area.find("Areas")
+    for area_xml in areas.getiterator("Area"):
+        for device in area_xml.find("Outputs"):
+            # _LOGGER.info(f"-------- {device}")
+            if device.get("OutputType") == "NON_DIM":
+                type = "switch"
+            elif device.get("OutputType") == "INC":
+                type = "light"
+
+            device_obj = {
+                CONF_ID: int(device.get("IntegrationID")),
+                CONF_NAME: device.get("Name"),
+                CONF_TYPE: type,
+            }
+            # if "Area" in device and "Name" in device["Area"]:
+            #     device_obj[CONF_AREA_NAME] = device["Area"]["Name"]
+            devices.append(device_obj)
+
+        #     output = Output(
+        #         self._lutron,
+        # name=output_xml.get("Name"),
+        # watts=int(output_xml.get("Wattage")),
+        # output_type=output_xml.get("OutputType"),
+        # integration_id=int(output_xml.get("IntegrationID")),
+        #     )
+        #     area.add_output(output)
+        # self.areas.append(area)
     return devices
+    ####################################
+    ####################################
+#     devices = []
+#     with open(fname, encoding="utf-8") as conf_file:
+#         integration_report = json.load(conf_file)
+#         # _LOGGER.debug(integration)
+#         if "LIPIdList" in integration_report:
+#             # lights and switches are in Zones
+#             if "Zones" in integration_report["LIPIdList"]:
+#                 _process_zones(devices, integration_report)
+#             # remotes are in Devices, except ID 1 which is the bridge itself
+#             if "Devices" in integration_report["LIPIdList"]:
+#                 for device in integration_report["LIPIdList"]["Devices"]:
+#                     # extract scenes from integration ID 1 - the smart bridge
+#                     if device["ID"] == 1 and "Buttons" in device:
+#                         _process_scenes(devices, device)
+#                     elif device["ID"] != 1 and "Buttons" in device:
+#                         device_obj = {
+#                             CONF_ID: device["ID"],
+#                             CONF_NAME: device["Name"],
+#                             CONF_TYPE: "sensor",
+#                             CONF_BUTTONS: [b["Number"] for b in device["Buttons"]],
+#                         }
+#                         if "Area" in device and "Name" in device["Area"]:
+#                             device_obj[CONF_AREA_NAME] = device["Area"]["Name"]
+#                         devices.append(device_obj)
+#         else:
+#             _LOGGER.warning(
+#                 "'LIPIdList' not found in the Integration Report."
+#                 " No devices will be loaded."
+#             )
+#     return devices
 
+# def _process_zones(devices, integration_report):
+#     """Process zones and append devices."""
+#     for zone in integration_report["LIPIdList"]["Zones"]:
+#         device_obj = {CONF_ID: zone["ID"], CONF_NAME: zone["Name"], CONF_TYPE: "light"}
+#         if "Area" in zone and "Name" in zone["Area"]:
+#             device_obj[CONF_AREA_NAME] = zone["Area"]["Name"]
+#         devices.append(device_obj)
 
-def _process_zones(devices, integration_report):
-    """Process zones and append devices."""
-    for zone in integration_report["LIPIdList"]["Zones"]:
-        # _LOGGER.debug(zone)
-        device_obj = {CONF_ID: zone["ID"],
-                      CONF_NAME: zone["Name"],
-                      CONF_TYPE: "light"}
-        if "Area" in zone and "Name" in zone["Area"]:
-            device_obj[CONF_AREA_NAME] = zone["Area"]["Name"]
-        devices.append(device_obj)
-
-
-def _process_scenes(devices, device):
-    """Process scenes and append devices."""
-    for button in device["Buttons"]:
-        if not button["Name"].startswith("Button "):
-            _LOGGER.info(
-                "Found scene %d, %s", button["Number"],
-                button["Name"])
-            devices.append({CONF_ID: device["ID"],
-                            CONF_NAME: button["Name"],
-                            CONF_SCENE_ID: button["Number"],
-                            CONF_TYPE: "scene"})
-
+# def _process_scenes(devices, device):
+#     """Process scenes and append devices."""
+#     for button in device["Buttons"]:
+#         if not button["Name"].startswith("Button "):
+#             _LOGGER.info(f"Found scene {button['Number']}, {button['Name']}")
+#             devices.append(
+#                 {
+#                     CONF_ID: device["ID"],
+#                     CONF_NAME: button["Name"],
+#                     CONF_SCENE_ID: button["Number"],
+#                     CONF_TYPE: "scene",
+#                 }
+#             )
+####################################
+####################################
 
 # pylint: disable=too-many-instance-attributes
 class Casetify:
